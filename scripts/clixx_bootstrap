@@ -1,0 +1,154 @@
+#!/bin/bash
+
+sudo su -
+
+sudo systemctl start httpd
+sudo systemctl enable httpd
+sudo systemctl start mariadb
+sudo systemctl enable mariadb
+
+#Set variables for EBS volumes and LUN
+EBS_VOLUMES="/dev/sdf /dev/sdg /dev/sdh /dev/sdi /dev/sdj"
+
+#Partition EBS volumes
+for volume in $EBS_VOLUMES; do
+  (
+    echo n
+    echo p
+    echo 1
+    echo
+    echo
+    echo w
+  ) | fdisk "$volume"
+done
+
+#Create disk labels
+pvcreate  /dev/sdf1 /dev/sdg1 /dev/sdh1 /dev/sdi1 /dev/sdj1
+
+#Create volume group
+vgcreate stack_vg /dev/sdf1 /dev/sdg1 /dev/sdh1 /dev/sdi1 /dev/sdj1
+
+
+#Create 5G LUNs
+lvcreate -L 5G -n Lv_u01 stack_vg
+lvcreate -L 5G -n Lv_u02 stack_vg
+lvcreate -L 5G -n Lv_u03 stack_vg
+lvcreate -L 5G -n Lv_u04 stack_vg
+lvcreate -L 5G -n Lv_u05 stack_vg
+
+#Create ext4 filesystems on LUNs
+
+mkfs.ext4 /dev/stack_vg/Lv_u01
+mkfs.ext4 /dev/stack_vg/Lv_u02
+mkfs.ext4 /dev/stack_vg/Lv_u03
+mkfs.ext4 /dev/stack_vg/Lv_u04
+mkfs.ext4 /dev/stack_vg/Lv_u05
+
+#Create LUN mount points
+
+mkdir /u01
+mkdir /u02
+mkdir /u03
+mkdir /u04
+mkdir /backups
+
+#Mount LUNs
+
+mount /dev/stack_vg/Lv_u01 /u01
+mount /dev/stack_vg/Lv_u02 /u02
+mount /dev/stack_vg/Lv_u03 /u03
+mount /dev/stack_vg/Lv_u04 /u04
+mount /dev/stack_vg/Lv_u05 /backups
+
+#Extend logical volume
+
+lvextend -L +3G /dev/mapper/stack_vg-Lv_u01
+
+#Resize filesystem
+
+resize2fs /dev/mapper/stack_vg-Lv_u01
+
+
+#Identify device files and mount points for the EBS volumes
+
+DEVICE1="/dev/stack_vg/Lv_u01"
+MOUNT1="/u01"
+DEVICE2="/dev/stack_vg/Lv_u02"
+MOUNT2="/u02"
+DEVICE3="/dev/stack_vg/Lv_u03"
+MOUNT3="/u03"
+DEVICE4="/dev/stack_vg/Lv_u04"
+MOUNT4="/u04"
+DEVICE5="/dev/stack_vg/Lv_u05"
+MOUNT5="/backups"
+
+#Add lines to /etc/fstab for each EBS volume
+echo "$DEVICE1    $MOUNT1    ext4    defaults,noatime    0    2" >> /etc/fstab
+echo "$DEVICE2    $MOUNT2    ext4    defaults,noatime    0    2" >> /etc/fstab
+echo "$DEVICE3    $MOUNT3    ext4    defaults,noatime    0    2" >> /etc/fstab
+echo "$DEVICE4    $MOUNT4    ext4    defaults,noatime    0    2" >> /etc/fstab
+echo "$DEVICE5    $MOUNT5    ext4    defaults,noatime    0    2" >> /etc/fstab
+
+#Mount EBS volumes
+mount -a
+
+echo "Mounting EFS filesystem ${efs_id} to ${mount_point}...in ${region} "
+
+#Createmount point
+mkdir -p ${mount_point}
+chown ec2-user:ec2-user ${mount_point}
+echo ${efs_id}.efs.${region}.amazonaws.com:/ ${mount_point} nfs4 nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,_netdev 0 0 >> /etc/fstab
+mount -a -t nfs4
+chmod -R 755 ${mount_point}
+
+#Add ec2-user to Apache group and grant permissions to /var/www
+usermod -a -G apache ec2-user
+chown -R ec2-user:apache /var/www
+chmod 2775 /var/www && find /var/www -type d -exec sudo chmod 2775 {} \;
+find /var/www -type f -exec sudo chmod 0664 {} \;
+
+cd /var/www/html
+
+dir_path=/var/www/html/CliXX_Retail_Repository
+
+if [[ -d $dir_path ]]
+then
+    echo "directory already exists"
+else
+    git clone https://github.com/stackitgit/CliXX_Retail_Repository.git
+
+    mv CliXX_Retail_Repository/* /var/www/html
+
+    mv /var/www/html/wp-config.php wp-config-old.php
+
+    cp wp-config-sample.php wp-config.php
+
+    #cd /var/www/html
+    sudo sed -i "s/'database_name_here'/'${DBName}'/g" wp-config.php
+    sudo sed -i "s/'username_here'/'${DBUser}'/g" wp-config.php
+    sudo sed -i "s/'password_here'/'${DBPassword}'/g" wp-config.php
+    sudo sed -i "s/'localhost'/'${rds}'/g" wp-config.php
+
+fi
+
+#Enable httpd 
+sudo systemctl enable httpd 
+sudo /sbin/sysctl -w net.ipv4.tcp_keepalive_time=200 net.ipv4.tcp_keepalive_intvl=200 net.ipv4.tcp_keepalive_probes=5
+
+#Connect to database and run query
+output=$(mysql -u wordpressuser --password=${DBPassword} -h ${rds} -D wordpressdb -e "SELECT option_value FROM wp_options WHERE option_value LIKE 'http%';")
+#Save output to a file
+echo "$output" > /var/www/html/output_file.txt
+
+second_line=$(sed -n 2p /var/www/html/output_file.txt)
+
+#Compare with second_line variable
+if [ "$second_line" == "http://${load_balancer_dns}" ]
+then
+    echo "It matches"
+else
+mysql -u wordpressuser --password=${DBPassword} -h ${rds} -D wordpressdb<<EOF
+UPDATE wp_options SET option_value = "http://${load_balancer_dns}" WHERE option_value LIKE 'http%';
+exit
+EOF
+fi
