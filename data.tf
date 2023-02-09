@@ -3,7 +3,7 @@ locals {
   launch_template_name = local.current_account_id == local.clixx_creds.auto_account_number ? "multi-az-clixx-auto" : "unknown" */
 
   wp_creds = jsondecode(
-    data.aws_secretsmanager_secret_version.clixxcreds.secret_string
+    data.aws_secretsmanager_secret_version.wp_creds.secret_string
   )
 
   aws_provider_config = {
