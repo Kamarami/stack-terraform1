@@ -74,6 +74,11 @@ resource "aws_autoscaling_group" "clixx-bastion-asg" {
     value               = "clixx-bastion"
     propagate_at_launch = true
   }
+  tag {
+    key                 = "Schedule"
+    value               = "A"
+    propagate_at_launch = true
+  }
 }
 
 #Wake up copy of Clixx Database Snapshot

@@ -14,6 +14,7 @@ echo ${db_name} >> /home/ec2-user/varfile
 echo ${db_username} >> /home/ec2-user/varfile
 echo ${db_password} >> /home/ec2-user/varfile
 echo ${efs_id} >> /home/ec2-user/varfile
+echo ${REGION} >> /home/ec2-user/varfile
 
 #Set variables for EBS volumes and LUN
 EBS_VOLUMES="/dev/sdf /dev/sdg /dev/sdh /dev/sdi /dev/sdj"
