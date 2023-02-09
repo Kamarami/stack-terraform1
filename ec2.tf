@@ -164,7 +164,7 @@ resource "aws_launch_template" "clixx-lt1" {
     }
   }
 
-  user_data = base64encode(data.bastion_user_data.rendered)
+  user_data = base64encode(data.clixx_bootstrap.rendered)
 }
 
 #Create target group
