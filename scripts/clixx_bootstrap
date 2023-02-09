@@ -7,8 +7,17 @@ sudo systemctl enable httpd
 sudo systemctl start mariadb
 sudo systemctl enable mariadb
 
+sudo echo "Lorem ipsum" > /home/ec2-user/varfile
+echo ${lb_dns_name} >> /home/ec2-user/varfile
+echo ${db_hostname} >>  /home/ec2-user/varfile
+echo ${db_name} >> /home/ec2-user/varfile
+echo ${db_username} >> /home/ec2-user/varfile
+echo ${db_password} >> /home/ec2-user/varfile
+echo ${efs_id} >> /home/ec2-user/varfile
+
 #Set variables for EBS volumes and LUN
 EBS_VOLUMES="/dev/sdf /dev/sdg /dev/sdh /dev/sdi /dev/sdj"
+LOGICAL_VOLUME_NAME=ebs_volume
 
 #Partition EBS volumes
 for volume in $EBS_VOLUMES; do
@@ -92,14 +101,14 @@ echo "$DEVICE5    $MOUNT5    ext4    defaults,noatime    0    2" >> /etc/fstab
 #Mount EBS volumes
 mount -a
 
-echo "Mounting EFS filesystem ${efs_id} to ${mount_point}...in ${region} "
+echo "Mounting EFS filesystem ${efs_id} to ${MOUNT_POINT}...in ${region} "
 
 #Createmount point
-mkdir -p ${mount_point}
-chown ec2-user:ec2-user ${mount_point}
-echo ${efs_id}.efs.${region}.amazonaws.com:/ ${mount_point} nfs4 nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,_netdev 0 0 >> /etc/fstab
+mkdir -p ${MOUNT_POINT}
+chown ec2-user:ec2-user ${MOUNT_POINT}
+echo ${efs_id}.efs.${region}.amazonaws.com:/ ${MOUNT_POINT} nfs4 nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,_netdev 0 0 >> /etc/fstab
 mount -a -t nfs4
-chmod -R 755 ${mount_point}
+chmod -R 755 ${MOUNT_POINT}
 
 #Add ec2-user to Apache group and grant permissions to /var/www
 usermod -a -G apache ec2-user
@@ -115,7 +124,7 @@ if [[ -d $dir_path ]]
 then
     echo "directory already exists"
 else
-    git clone https://github.com/stackitgit/CliXX_Retail_Repository.git
+    git clone -b development https://github.com/stackitgit/CliXX_Retail_Repository.git
 
     mv CliXX_Retail_Repository/* /var/www/html
 
@@ -124,31 +133,34 @@ else
     cp wp-config-sample.php wp-config.php
 
     #cd /var/www/html
-    sudo sed -i "s/'database_name_here'/'${DBName}'/g" wp-config.php
-    sudo sed -i "s/'username_here'/'${DBUser}'/g" wp-config.php
-    sudo sed -i "s/'password_here'/'${DBPassword}'/g" wp-config.php
-    sudo sed -i "s/'localhost'/'${rds}'/g" wp-config.php
+    sudo sed -i "s/'database_name_here'/'${db_name}'/g" wp-config.php
+    sudo sed -i "s/'username_here'/'${db_username}'/g" wp-config.php
+    sudo sed -i "s/'password_here'/'${db_password}'/g" wp-config.php
+    sudo sed -i "s/'localhost'/'${db_hostname}'/g" wp-config.php
 
 fi
+
+#Allow wordpress to use Permalinks
+sudo sed -i '151s/None/All/' /etc/httpd/conf/httpd.conf
 
 #Enable httpd 
 sudo systemctl enable httpd 
 sudo /sbin/sysctl -w net.ipv4.tcp_keepalive_time=200 net.ipv4.tcp_keepalive_intvl=200 net.ipv4.tcp_keepalive_probes=5
 
 #Connect to database and run query
-output=$(mysql -u wordpressuser --password=${DBPassword} -h ${rds} -D wordpressdb -e "SELECT option_value FROM wp_options WHERE option_value LIKE 'http%';")
+output=$(mysql -u wordpressuser --password=${db_password} -h ${db_hostname} -D wordpressdb -e "SELECT option_value FROM wp_options WHERE option_value LIKE 'http%';")
 #Save output to a file
 echo "$output" > /var/www/html/output_file.txt
 
 second_line=$(sed -n 2p /var/www/html/output_file.txt)
 
 #Compare with second_line variable
-if [ "$second_line" == "http://${load_balancer_dns}" ]
+if [ "$second_line" == "http://${lb_dns_name}" ]
 then
-    echo "It matches"
+    echo "we good"
 else
-mysql -u wordpressuser --password=${DBPassword} -h ${rds} -D wordpressdb<<EOF
-UPDATE wp_options SET option_value = "http://${load_balancer_dns}" WHERE option_value LIKE 'http%';
+mysql -u wordpressuser --password=${db_password} -h ${db_hostname} -D wordpressdb<<EOF
+UPDATE wp_options SET option_value = "http://${lb_dns_name}" WHERE option_value LIKE 'http%';
 exit
 EOF
 fi

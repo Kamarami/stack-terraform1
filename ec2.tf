@@ -144,7 +144,7 @@ resource "aws_launch_template" "clixx-lt1" {
     cpu_credits = "standard"
   }
 
-  image_id = "ami-0b5eea76982371e91"
+  image_id = local.wp_creds.ami
 
   instance_type = "t2.micro"
 
@@ -164,7 +164,7 @@ resource "aws_launch_template" "clixx-lt1" {
     }
   }
 
-  user_data = base64encode(data.template_file.bootstrap.rendered)
+  user_data = base64encode(data.bastion_user_data.rendered)
 }
 
 #Create target group

@@ -28,7 +28,7 @@ pipeline {
                  sh "terraform plan -out=tfplan -input=false"
              }
          }
-        stage('Final Deployment Approvall') {
+        stage('Final Deployment Approval') {
               steps {
                 script {
                 def userInput = input(id: 'confirm', message: 'Apply Terraform?', parameters: [ [$class: 'BooleanParameterDefinition', defaultValue: false, description: 'Apply terraform', name: 'confirm'] ])
