@@ -4,7 +4,7 @@ pipeline {
         PATH    = "${PATH}:${getTerraformPath()}"
         AMI_ID  = "stack-ami-${BUILD_NUMBER}"
         VERSION = "1.0.${BUILD_NUMBER}"
-        RUNNER  = "Mohamed" 
+        // RUNNER  = "Mohamed" 
     }
     stages{
         stage('Initial Stage') {
@@ -35,12 +35,12 @@ pipeline {
              }
            }
         }
-         stage('Terraform Apply'){
+         stage('Terraform Apply or Destroy'){
              steps {
                  //sh "returnStatus: true, script: 'terraform workspace new dev'"
                  //sh "terraform apply -auto-approve"
                  // sh "terraform apply  -input=false tfplan"
-                 sh "terraform destroy -auto-approve"
+                 sh "terraform $ACTION -auto-approve"
              }
          }
 
