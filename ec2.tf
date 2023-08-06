@@ -3,17 +3,17 @@
 # data.aws_secretsmanager_secret_version.clixxcreds.secret_string
 # )
 # }
-/* locals {
-  current_account = data.aws_caller_identity.current.account_id
-  instance_name   = local.current_account == var.R ? "Clixxtf-dev" : local.current_account == var.automation-account-id ? "Clixxtf-automation" : "invalid"
+locals {
+  /* current_account = data.aws_caller_identity.current.account_id
+  instance_name   = local.current_account == var.R ? "Clixxtf-dev" : local.current_account == var.automation-account-id ? "Clixxtf-automation" : "invalid" */
   clixx_creds = jsondecode(
     data.aws_secretsmanager_secret_version.clixxcreds.secret_string
   )
-  aws_provider_config = {
+  /* aws_provider_config = {
     access_key = local.clixx_creds.AWS_ACCESS_KEY
     secret_key = local.clixx_creds.AWS_SECRET_KEY
-  }
-} */
+  } */
+}
 
 
 #Keypair for access
