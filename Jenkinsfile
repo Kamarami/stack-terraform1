@@ -18,7 +18,7 @@ pipeline {
              steps {
                  //sh "returnStatus: true, script: 'terraform workspace new dev'"
                  sh "terraform init"
-                 slackSend (color: '#FFFF00', message: "STARTING TERRAFORM DEPLOYMENT ${env.RUNNER}: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})")
+                 slackSend (color: '#FFFF00', message: "STARTING TERRAFORM DEPLOYMENT ${env.RUNNER}: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL}/input)")
          }
          }
          stage('terraform plan'){
@@ -40,7 +40,7 @@ pipeline {
                  //sh "returnStatus: true, script: 'terraform workspace new dev'"
                  //sh "terraform apply -auto-approve"
                  // sh "terraform apply  -input=false tfplan"
-                 sh "terraform $ACTION -auto-approve"
+                 sh "terraform ${ACTION} -auto-approve"
              }
          }
 

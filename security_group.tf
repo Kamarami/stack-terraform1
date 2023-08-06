@@ -195,7 +195,7 @@
 
 
 
-#Security group to loadbalancer
+#Load Balancer security group
 
 
 resource "aws_security_group" "lb-sg" {
@@ -210,6 +210,15 @@ resource "aws_security_group_rule" "lb-http-rule" {
   protocol          = "tcp"
   from_port         = 80
   to_port           = 80
+  cidr_blocks       = ["0.0.0.0/0"]
+}
+
+resource "aws_security_group_rule" "lb-http-tcp-rule" {
+  security_group_id = aws_security_group.lb-sg.id
+  type              = "ingress"
+  protocol          = "tcp"
+  from_port         = 8080
+  to_port           = 8080
   cidr_blocks       = ["0.0.0.0/0"]
 }
 
@@ -232,7 +241,7 @@ resource "aws_security_group_rule" "lb-egress-rule" {
 }
 ##################################################################
 
-#Security group for launch template
+#Launch Template security group
 
 resource "aws_security_group" "lt-sg" {
   vpc_id      = aws_vpc.clixxvpc.id
@@ -261,6 +270,16 @@ resource "aws_security_group_rule" "lt-http-rule" {
   source_security_group_id = aws_security_group.lb-sg.id
 }
 
+resource "aws_security_group_rule" "lt-http-tcp-rule" {
+  security_group_id = aws_security_group.lt-sg.id
+  type              = "ingress"
+  protocol          = "tcp"
+  from_port         = 8080
+  to_port           = 8080
+
+  source_security_group_id = aws_security_group.lb-sg.id
+}
+
 resource "aws_security_group_rule" "lt-https-rule" {
   security_group_id        = aws_security_group.lt-sg.id
   type                     = "ingress"
@@ -277,6 +296,16 @@ resource "aws_security_group_rule" "lt-nfs-rule" {
   from_port                = 2049
   to_port                  = 2049
   source_security_group_id = aws_security_group.efs-sg.id
+}
+
+resource "aws_security_group_rule" "lt-rds-rule" {
+  security_group_id = aws_security_group.lt-sg.id
+  type              = "ingress"
+  protocol          = "tcp"
+  from_port         = 3306
+  to_port           = 3306
+
+  source_security_group_id = aws_security_group.lb-sg.id
 }
 
 resource "aws_security_group_rule" "lt-egress-rule" {
